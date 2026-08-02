@@ -1,0 +1,83 @@
+// ============================================================================
+// MISSION-0002 — Ajouts/corrections à fusionner dans le schema.prisma existant
+// ============================================================================
+// À FAIRE MANUELLEMENT AVANT MIGRATION :
+// 1. Copier le bloc `generator` / `datasource` de ton schema.prisma actuel
+//    en haut de ce fichier (non reproduit ici pour éviter tout conflit).
+// 2. Si un modèle Mission existe déjà avec un statut en enum différent,
+//    NE PAS écraser aveuglément : voir section "Impact migration" plus bas.
+// 3. Lancer : npx prisma migrate dev --name mission_lifecycle_and_validation
+// ============================================================================
+
+// Cycle de vie officiel — DOC-0004 v2.0.0
+// BROUILLON → QUALIFIEE → PLANIFIEE → EN_COURS → EN_VALIDATION → TERMINEE → ARCHIVEE
+// États exceptionnels : SUSPENDUE / ABANDONNEE
+enum MissionStatus {
+  BROUILLON
+  QUALIFIEE
+  PLANIFIEE
+  EN_COURS
+  EN_VALIDATION
+  TERMINEE
+  ARCHIVEE
+  SUSPENDUE
+  ABANDONNEE
+}
+
+enum ValidationDecision {
+  VALIDEE
+  REFUSEE
+}
+
+model Mission {
+  id          String        @id @default(cuid())
+  code        String        @unique // ex: "MISSION-0001"
+  titre       String
+  description String?
+  statut      MissionStatus @default(BROUILLON)
+
+  // Renseigné par le développeur au moment de "déclarer la mission terminée"
+  resultat       String? // résultat livré
+  testsEffectues String? // description des tests effectués
+
+  // Code de validation en attente de vérification (MC-XXXX).
+  // Généré à la déclaration de fin, consommé (déplacé vers l'historique) à la validation/au refus.
+  // NE SIGNIFIE PAS "mission validée" — voir MissionValidation pour la décision réelle.
+  codeValidationEnCours String?
+  declaredCompleteAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  validations MissionValidation[]
+}
+
+// Historique d'audit — chaque tentative de clôture (déclaration de fin + décision humaine)
+model MissionValidation {
+  id        String  @id @default(cuid())
+  missionId String
+  mission   Mission @relation(fields: [missionId], references: [id])
+
+  codeValidation String // le code MC-XXXX effectivement vérifié pour cet événement
+  statutAvant    MissionStatus
+  statutApres    MissionStatus
+  decision       ValidationDecision
+
+  // Identité déclarative du validateur — LIMITE ASSUMÉE (voir rapport).
+  // Pas d'authentification réelle à ce stade du projet.
+  validateurNom String
+
+  raisonRefus String? // obligatoire côté API si decision = REFUSEE
+
+  createdAt DateTime @default(now())
+}
+
+// ============================================================================
+// Impact migration si un modèle Mission existe déjà avec un enum différent :
+// - Prisma va générer une migration qui ALTER TYPE l'enum existant.
+// - Si des lignes en base ont une valeur de statut absente du nouvel enum
+//   (ex: un ancien "VALIDATION" au lieu de "EN_VALIDATION"), la migration
+//   échouera. Dans ce cas : écrire une migration de données manuelle
+//   (UPDATE ... SET statut = ... avant l'ALTER TYPE) — ne jamais forcer
+//   un DROP/CREATE qui perdrait les statuts existants.
+// ============================================================================
