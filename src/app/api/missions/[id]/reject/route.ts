@@ -4,10 +4,14 @@ import { prisma } from "@/lib/prisma";
 // POST /api/missions/[id]/reject
 // Body: { code: string, validateurNom: string, raisonRefus: string }
 //
-// Transition EN_VALIDATION -> EN_COURS ("retour en correction").
-// Le code doit également correspondre : on trace QUI a refusé QUOI, avec preuve
-// qu'il a bien consulté le bon événement de fin de mission.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+// Transition EN_VALIDATION -> EN_COURS.
+// Le refus est une décision humaine et la raison est conservée dans l'historique.
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
   const body = await req.json().catch(() => null);
   const code = (body?.code ?? "").trim().toUpperCase();
   const validateurNom = (body?.validateurNom ?? "").trim();
@@ -20,33 +24,48 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     );
   }
 
-  const mission = await prisma.mission.findUnique({ where: { id: params.id } });
+  const mission = await prisma.mission.findUnique({
+    where: { id },
+  });
+
   if (!mission) {
-    return NextResponse.json({ error: "Mission introuvable" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Mission introuvable" },
+      { status: 404 }
+    );
   }
 
   if (mission.statut !== "EN_VALIDATION") {
     return NextResponse.json(
-      { error: `Transition invalide : statut actuel ${mission.statut}, attendu EN_VALIDATION` },
+      {
+        error: `Transition invalide : statut actuel ${mission.statut}, attendu EN_VALIDATION`,
+      },
       { status: 409 }
     );
   }
 
-  if (!mission.codeValidationEnCours || mission.codeValidationEnCours !== code) {
-    return NextResponse.json({ error: "Code de validation incorrect." }, { status: 422 });
+  if (
+    !mission.codeValidationEnCours ||
+    mission.codeValidationEnCours !== code
+  ) {
+    return NextResponse.json(
+      { error: "Code de validation incorrect." },
+      { status: 422 }
+    );
   }
 
   const [updatedMission] = await prisma.$transaction([
     prisma.mission.update({
-      where: { id: params.id },
+      where: { id },
       data: {
         statut: "EN_COURS",
         codeValidationEnCours: null,
       },
     }),
+
     prisma.missionValidation.create({
       data: {
-        missionId: params.id,
+        missionId: id,
         codeValidation: code,
         statutAvant: "EN_VALIDATION",
         statutApres: "EN_COURS",

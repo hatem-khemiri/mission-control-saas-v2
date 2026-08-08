@@ -9,14 +9,17 @@ type ValidationEvent = {
   decision: "VALIDEE" | "REFUSEE";
   validateurNom: string;
   raisonRefus: string | null;
-  createdAt: string;
+  createdAt: Date | string;
 };
 
 type Mission = {
   id: string;
-  code: string;
+  reference: string;
   titre: string;
+  objectif: string | null;
   statut: string;
+  responsable: string | null;
+  codeValidation: string | null; // champ MISSION-0001, distinct de codeValidationEnCours
   resultat: string | null;
   testsEffectues: string | null;
   codeValidationEnCours: string | null;
@@ -38,7 +41,7 @@ export default function MissionValidationPanel({ mission }: { mission: Mission }
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/missions/${mission.id}/${action}`, {
+      const res = await fetch(`/api/missions/${mission.reference}/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(
@@ -95,7 +98,7 @@ export default function MissionValidationPanel({ mission }: { mission: Mission }
   return (
     <div className="rounded-lg border-2 border-red-600 bg-red-50 p-4">
       <p className="text-lg font-bold text-red-700">🔴 MISSION TERMINÉE — VALIDATION REQUISE</p>
-      <p className="mt-1 font-mono text-sm text-red-900">{mission.code}</p>
+      <p className="mt-1 font-mono text-sm text-red-900">{mission.reference}</p>
       <p className="mt-2 text-sm text-red-900">{mission.resultat}</p>
       <p className="text-sm text-red-800">Tests : {mission.testsEffectues}</p>
       <p className="mt-2 font-mono text-base font-bold text-red-700">

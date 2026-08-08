@@ -24,6 +24,16 @@ export const MISSION_STATUS_LABEL: Record<MissionStatus, string> = {
   ABANDONNEE: "Abandonnée",
 };
 
+export const MISSION_STATUS_BADGE_CLASS: Record<MissionStatus, string> = {
+  BROUILLON: "border-slate-600 bg-slate-800/60 text-slate-300",
+  QUALIFIEE: "border-sky-700 bg-sky-950/40 text-sky-300",
+  EN_COURS: "border-blue-700 bg-blue-950/40 text-blue-300",
+  EN_VALIDATION: "border-red-600 bg-red-950/50 text-red-300",
+  TERMINEE: "border-emerald-700 bg-emerald-950/40 text-emerald-300",
+  SUSPENDUE: "border-amber-700 bg-amber-950/40 text-amber-300",
+  ABANDONNEE: "border-rose-800 bg-rose-950/40 text-rose-400",
+};
+
 /**
  * Génère un code de fin de mission au format MC-XXXX.
  * Rappel obligatoire (SYS-0001 / DOC-0004, règle R6) :

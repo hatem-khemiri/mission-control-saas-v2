@@ -1,17 +1,23 @@
 // ============================================================================
-// MISSION-0002 — Ajouts/corrections à fusionner dans le schema.prisma existant
+// MISSION-0002 v3 — schema.prisma COMPLET, sans régression sur MISSION-0001
 // ============================================================================
-// À FAIRE MANUELLEMENT AVANT MIGRATION :
-// 1. Copier le bloc `generator` / `datasource` de ton schema.prisma actuel
-//    en haut de ce fichier (non reproduit ici pour éviter tout conflit).
-// 2. Si un modèle Mission existe déjà avec un statut en enum différent,
-//    NE PAS écraser aveuglément : voir section "Impact migration" plus bas.
-// 3. Lancer : npx prisma migrate dev --name mission_lifecycle_and_validation
+// ⚠️ Bloc generator/datasource : configuration standard (prisma-client-js /
+// postgresql / DATABASE_URL). Toujours pas vérifié en lecture directe contre
+// ton fichier réel — diff ces 8 lignes avant migration. Si ça diffère,
+// remplace uniquement ce bloc, le reste (enums + modèles) est indépendant.
 // ============================================================================
 
-// Cycle de vie officiel — DOC-0004 v2.0.0
-// BROUILLON → QUALIFIEE → PLANIFIEE → EN_COURS → EN_VALIDATION → TERMINEE → ARCHIVEE
-// États exceptionnels : SUSPENDUE / ABANDONNEE
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================================
+// Cycle de vie officiel — DOC-0004 v2.0.0 (inchangé)
+// ============================================================================
 enum MissionStatus {
   BROUILLON
   QUALIFIEE
@@ -29,42 +35,62 @@ enum ValidationDecision {
   REFUSEE
 }
 
+// ============================================================================
+// Mission — MISSION-0001 (champs réels, préservés intégralement) + MISSION-0002
+// ============================================================================
 model Mission {
-  id          String        @id @default(cuid())
-  code        String        @unique // ex: "MISSION-0001"
-  titre       String
-  description String?
-  statut      MissionStatus @default(BROUILLON)
+  // --- Champs MISSION-0001 : PRÉSERVÉS, aucune suppression, aucun renommage ---
+  id           String        @id @default(cuid())
+  reference    String        @unique
+  titre        String
+  // ⚠️ ASSUMPTION DE TYPE — je connais le NOM de ces 2 champs (fourni par toi)
+  // mais pas leur type exact ni leur nullabilité réelle dans MISSION-0001.
+  // `objectif` : supposé String? (texte libre). Si c'est en réalité une
+  // String obligatoire, retire le "?". Vérifie avant migration.
+  objectif     String?
+  statut       MissionStatus @default(BROUILLON)
+  // `responsable` : supposé String? (nom en texte libre). RISQUE LE PLUS
+  // ÉLEVÉ de cette liste : si c'est en réalité une RELATION vers un modèle
+  // User/Utilisateur (ex: `responsable User @relation(...)` avec un
+  // `responsableId String`), cette définition scalaire est FAUSSE et doit
+  // être remplacée par la relation réelle avant toute migration.
+  responsable  String?
+  // `codeValidation` : champ EXISTANT de MISSION-0001, préservé tel quel.
+  // Je ne connais pas sa sémantique exacte ni comment MISSION-0001 l'utilise,
+  // donc je ne le touche pas et ne le réutilise pas pour la logique
+  // MISSION-0002 (voir `codeValidationEnCours` ci-dessous, qui est un champ
+  // SÉPARÉ et NOUVEAU, pour ne rien casser côté MISSION-0001).
+  codeValidation String?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
 
-  // Renseigné par le développeur au moment de "déclarer la mission terminée"
-  resultat       String? // résultat livré
-  testsEffectues String? // description des tests effectués
-
-  // Code de validation en attente de vérification (MC-XXXX).
-  // Généré à la déclaration de fin, consommé (déplacé vers l'historique) à la validation/au refus.
-  // NE SIGNIFIE PAS "mission validée" — voir MissionValidation pour la décision réelle.
-  codeValidationEnCours String?
-  declaredCompleteAt    DateTime?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  // --- Champs ajoutés par MISSION-0002 : aucun conflit de nom avec l'existant ---
+  resultat               String?
+  testsEffectues          String?
+  codeValidationEnCours   String?
+  declaredCompleteAt      DateTime?
 
   validations MissionValidation[]
+
+  @@map("missions")
 }
 
-// Historique d'audit — chaque tentative de clôture (déclaration de fin + décision humaine)
+// ============================================================================
+// MissionValidation — nouveau modèle MISSION-0002, historique d'audit complet
+// ============================================================================
 model MissionValidation {
   id        String  @id @default(cuid())
   missionId String
   mission   Mission @relation(fields: [missionId], references: [id])
 
-  codeValidation String // le code MC-XXXX effectivement vérifié pour cet événement
+  codeValidation String // le code MC-XXXX effectivement vérifié pour CET événement
+                         // (nom de champ identique à Mission.codeValidation mais
+                         //  modèle différent : aucune collision réelle en base)
   statutAvant    MissionStatus
   statutApres    MissionStatus
   decision       ValidationDecision
 
-  // Identité déclarative du validateur — LIMITE ASSUMÉE (voir rapport).
-  // Pas d'authentification réelle à ce stade du projet.
+  // Identité déclarative du validateur — LIMITE ASSUMÉE (voir README).
   validateurNom String
 
   raisonRefus String? // obligatoire côté API si decision = REFUSEE
@@ -73,11 +99,14 @@ model MissionValidation {
 }
 
 // ============================================================================
-// Impact migration si un modèle Mission existe déjà avec un enum différent :
-// - Prisma va générer une migration qui ALTER TYPE l'enum existant.
-// - Si des lignes en base ont une valeur de statut absente du nouvel enum
-//   (ex: un ancien "VALIDATION" au lieu de "EN_VALIDATION"), la migration
-//   échouera. Dans ce cas : écrire une migration de données manuelle
-//   (UPDATE ... SET statut = ... avant l'ALTER TYPE) — ne jamais forcer
-//   un DROP/CREATE qui perdrait les statuts existants.
+// Impact migration :
+// - `reference` @unique non-nullable : renseigner les valeurs manquantes
+//   avant migration si des missions existent déjà sans reference.
+// - Si `objectif`/`responsable`/`codeValidation` sont en réalité NOT NULL
+//   dans MISSION-0001, retirer le "?" correspondant AVANT de migrer, sinon
+//   Prisma va relâcher une contrainte NOT NULL existante (pas destructif en
+//   soi, mais ce n'est pas ce que tu veux si la contrainte était voulue).
+// - Idem si `responsable` est une relation réelle : la définition scalaire
+//   ci-dessus doit être remplacée avant toute migration, sous peine de
+//   supprimer la contrainte de clé étrangère existante.
 // ============================================================================

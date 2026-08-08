@@ -6,10 +6,16 @@ import { generateValidationCode } from "@/lib/generateValidationCode";
 // Body: { resultat: string, testsEffectues: string }
 //
 // Transition EN_COURS -> EN_VALIDATION.
-// Génère un code MC-XXXX et le PERSISTE sur la mission (codeValidationEnCours).
-// Ceci ne valide RIEN : c'est uniquement la déclaration du développeur.
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+// Génère un code MC-XXXX et le persiste sur la mission.
+// Ceci ne valide rien : c'est uniquement la déclaration du développeur.
+export async function POST(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+
   const body = await req.json().catch(() => null);
+
   if (!body?.resultat || !body?.testsEffectues) {
     return NextResponse.json(
       { error: "resultat et testsEffectues sont obligatoires" },
@@ -17,14 +23,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     );
   }
 
-  const mission = await prisma.mission.findUnique({ where: { id: params.id } });
+  const mission = await prisma.mission.findUnique({
+    where: { id },
+  });
+
   if (!mission) {
-    return NextResponse.json({ error: "Mission introuvable" }, { status: 404 });
+    return NextResponse.json(
+      { error: "Mission introuvable" },
+      { status: 404 }
+    );
   }
 
   if (mission.statut !== "EN_COURS") {
     return NextResponse.json(
-      { error: `Transition invalide : la mission est en statut ${mission.statut}, pas EN_COURS` },
+      {
+        error: `Transition invalide : la mission est en statut ${mission.statut}, pas EN_COURS`,
+      },
       { status: 409 }
     );
   }
@@ -32,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const code = generateValidationCode();
 
   const updated = await prisma.mission.update({
-    where: { id: params.id },
+    where: { id },
     data: {
       statut: "EN_VALIDATION",
       resultat: body.resultat,
