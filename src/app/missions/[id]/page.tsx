@@ -1,20 +1,36 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import NavBar from "@/components/NavBar";
-import MissionValidationAlert from "@/components/MissionValidationAlert";
+import MissionValidationPanel from "@/components/MissionValidationPanel";
 import {
   MISSION_STATUS_LABEL,
   MISSION_STATUS_BADGE_CLASS,
 } from "@/lib/missions";
-import { getMissionByReference } from "@/lib/missionsData";
+import { prisma } from "@/lib/prisma";
 
+// MISSION-0004 : cette page lit désormais l'état réel de la mission depuis
+// PostgreSQL (via Prisma), et non plus depuis src/lib/missionsData.ts.
+// [id] est la référence publique de la mission (ex: MISSION-0001) — c'est ce
+// qui est utilisé pour la recherche (Mission.reference), jamais l'id interne.
+//
+// Le tableau de bord (/) et la liste (/missions) restent volontairement
+// alimentés par missionsData.ts : ce n'est pas le périmètre de MISSION-0004
+// (voir DELIVERY-MISSION-0004.md, section "Points connus").
 export default async function MissionDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const mission = getMissionByReference(id);
+
+  const mission = await prisma.mission.findUnique({
+    where: { reference: id },
+    include: {
+      validations: {
+        orderBy: { createdAt: "desc" },
+      },
+    },
+  });
 
   if (!mission) notFound();
 
@@ -84,17 +100,17 @@ export default async function MissionDetailPage({
           </section>
         )}
 
-        {mission.statut === "EN_VALIDATION" && mission.codeValidation && (
-          <section className="mt-8">
-            <MissionValidationAlert
-              missionId={mission.reference}
-              titre={mission.titre}
-              resultat={mission.resultat ?? ""}
-              code={mission.codeValidation}
-              dateFin={new Date(mission.updatedAt).toLocaleString("fr-FR")}
-            />
-          </section>
-        )}
+        {/*
+          Panneau de validation réel (MISSION-0002/MISSION-0004) : persistance
+          PostgreSQL via /api/missions/[id]/validate et /reject. Rendu
+          inconditionnel : le panneau gère lui-même l'affichage selon le
+          statut (en attente / validée persistée / pas de validation en
+          cours). Remplace définitivement l'ancien composant d'alerte à état
+          local (useState, non persistant), qui a été retiré du projet.
+        */}
+        <section className="mt-8">
+          <MissionValidationPanel mission={mission} />
+        </section>
       </main>
 
       <footer className="border-t border-slate-800 px-6 py-6 text-center text-xs text-slate-600">

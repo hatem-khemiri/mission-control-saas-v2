@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/missions/[id]
+// [id] est ici la référence publique de la mission (ex: MISSION-0001),
+// conformément à la convention Mission.reference comme identifiant fonctionnel.
 // Lecture de l'état réel depuis PostgreSQL.
 export async function GET(
   _req: NextRequest,
@@ -10,7 +12,7 @@ export async function GET(
   const { id } = await params;
 
   const mission = await prisma.mission.findUnique({
-    where: { id },
+    where: { reference: id },
     include: {
       validations: {
         orderBy: { createdAt: "desc" },

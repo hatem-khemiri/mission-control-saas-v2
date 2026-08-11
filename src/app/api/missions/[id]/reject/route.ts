@@ -25,7 +25,7 @@ export async function POST(
   }
 
   const mission = await prisma.mission.findUnique({
-    where: { id },
+    where: { reference: id },
   });
 
   if (!mission) {
@@ -56,7 +56,7 @@ export async function POST(
 
   const [updatedMission] = await prisma.$transaction([
     prisma.mission.update({
-      where: { id },
+      where: { reference: id },
       data: {
         statut: "EN_COURS",
         codeValidationEnCours: null,
@@ -65,7 +65,9 @@ export async function POST(
 
     prisma.missionValidation.create({
       data: {
-        missionId: id,
+        // FK réelle : MissionValidation.missionId référence Mission.id (cuid interne),
+        // pas Mission.reference. Utiliser mission.id trouvé ci-dessus.
+        missionId: mission.id,
         codeValidation: code,
         statutAvant: "EN_VALIDATION",
         statutApres: "EN_COURS",

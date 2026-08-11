@@ -24,7 +24,7 @@ export async function POST(
   }
 
   const mission = await prisma.mission.findUnique({
-    where: { id },
+    where: { reference: id },
   });
 
   if (!mission) {
@@ -46,7 +46,7 @@ export async function POST(
   const code = generateValidationCode();
 
   const updated = await prisma.mission.update({
-    where: { id },
+    where: { reference: id },
     data: {
       statut: "EN_VALIDATION",
       resultat: body.resultat,
