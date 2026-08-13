@@ -123,42 +123,98 @@ export default function MissionValidationPanel({ mission }: { mission: Mission }
       )}
 
       {mode !== "idle" && (
-        <div className="mt-4 space-y-2 rounded border border-red-300 bg-white p-3">
+        <div className="mt-4 space-y-4 rounded border border-red-300 bg-white p-4">
           <p className="text-xs text-gray-500">
             ⚠️ Identité déclarative uniquement — aucune authentification réelle à ce stade.
           </p>
-          <input
-            className="w-full rounded border px-2 py-1 text-sm"
-            placeholder="Code de validation (ex: MC-7F42)"
-            value={codeInput}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCodeInput(e.target.value)}
-          />
-          <input
-            className="w-full rounded border px-2 py-1 text-sm"
-            placeholder="Votre nom"
-            value={nomInput}
-            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNomInput(e.target.value)}
-          />
-          {mode === "reject" && (
-            <textarea
-              className="w-full rounded border px-2 py-1 text-sm"
-              placeholder="Raison du refus"
-              value={raisonInput}
-              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRaisonInput(e.target.value)}
+
+          <div>
+            <label
+              htmlFor="mvp-code"
+              className="block text-sm font-semibold text-gray-900"
+            >
+              Code de validation
+            </label>
+            <p className="mt-0.5 text-xs text-gray-600">
+              Saisissez le code affiché ci-dessus (
+              <span className="font-mono font-semibold text-red-700">
+                {mission.codeValidationEnCours}
+              </span>
+              ) pour confirmer que vous avez examiné le résultat de la
+              mission.
+            </p>
+            <input
+              id="mvp-code"
+              className="mt-1.5 w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="ex : MC-7F42"
+              value={codeInput}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCodeInput(e.target.value)}
             />
+          </div>
+
+          <div>
+            <label
+              htmlFor="mvp-nom"
+              className="block text-sm font-semibold text-gray-900"
+            >
+              Nom du valideur
+            </label>
+            <p className="mt-0.5 text-xs text-gray-600">
+              Votre nom sera enregistré dans l&apos;historique comme la
+              personne ayant pris cette décision.
+            </p>
+            <input
+              id="mvp-nom"
+              className="mt-1.5 w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              placeholder="ex : Hatem Khemiri"
+              value={nomInput}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNomInput(e.target.value)}
+            />
+          </div>
+
+          {mode === "reject" && (
+            <div>
+              <label
+                htmlFor="mvp-raison"
+                className="block text-sm font-semibold text-gray-900"
+              >
+                Raison du retour en correction
+              </label>
+              <p className="mt-0.5 text-xs text-gray-600">
+                Expliquez ce qui doit être corrigé avant une nouvelle demande
+                de validation.
+              </p>
+              <textarea
+                id="mvp-raison"
+                className="mt-1.5 w-full rounded border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                placeholder="ex : Le résultat ne couvre pas le cas X"
+                value={raisonInput}
+                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setRaisonInput(e.target.value)}
+              />
+            </div>
           )}
-          {error && <p className="text-sm text-red-600">{error}</p>}
-          <div className="flex gap-2">
+
+          {error && <p className="text-sm font-medium text-red-600">{error}</p>}
+
+          <div className="flex gap-2 pt-1">
             <button
               disabled={loading}
               onClick={() => submit(mode === "validate" ? "validate" : "reject")}
-              className="rounded bg-blue-600 px-3 py-1.5 text-sm font-medium text-white disabled:opacity-50"
+              className={`rounded px-4 py-2 text-sm font-semibold text-white disabled:opacity-50 ${
+                mode === "validate"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-orange-600 hover:bg-orange-700"
+              }`}
             >
-              {loading ? "Envoi..." : "Confirmer"}
+              {loading
+                ? "Envoi..."
+                : mode === "validate"
+                  ? "Valider la mission"
+                  : "Confirmer le retour en correction"}
             </button>
             <button
               onClick={() => setMode("idle")}
-              className="rounded bg-gray-200 px-3 py-1.5 text-sm"
+              className="rounded bg-gray-200 px-3 py-2 text-sm font-medium text-gray-800 hover:bg-gray-300"
             >
               Annuler
             </button>
